@@ -8,7 +8,7 @@ import ollama
 load_dotenv()
 
 # 모델 설정
-MODEL_NAME = os.getenv("OLLAMA_MODEL_ID", "granite-code:20b")
+MODEL_NAME = os.getenv("OLLAMA_MODEL_ID", "deepseek-r1:32b")
 TRANSLATION_MODEL = os.getenv("OLLAMA_TRANSLATION_MODEL", "llama2")
 
 # 명령어 실행 함수
@@ -74,86 +74,259 @@ class AutonomousAgent:
         generated_filename = None 
 
         if code_override: # 기존 코드 수정 모드
-            error_context_for_ai = ""
-            if error_message:
-                # Pygame 프로젝트에서 실행 타임아웃이 발생한 경우 특별한 컨텍스트 제공
-                if "timed out" in error_message.lower() and \
-                   "execution of" in error_message.lower() and \
-                   current_filename_for_context and \
-                   "pygame" in self.project_goal.lower():
-                    error_context_for_ai = f"""
-The Python script '{current_filename_for_context}' started execution but did not finish within the {self.get_execution_timeout()} second time limit.
-This is a common situation for Pygame applications, as they typically enter a game loop that runs until the user quits.
-This timeout likely means the game initialized and entered its main loop, but the automated test had to stop it.
+            # 에러가 있는 경우 부분 수정 시도, 없으면 전체 재생성
+            if error_message and self._is_suitable_for_partial_fix(error_message):
+                return self._request_partial_fix(code_override, error_message, current_filename_for_context)
+            else:
+                return self._request_full_rewrite(code_override, error_message, current_filename_for_context)
+        else: # 새 코드 생성 모드
+            return self._request_new_code_generation()
 
-Please review the code, especially the Pygame initialization, event handling, and the main game loop.
-Ensure that:
-1. Pygame initializes correctly without any immediate errors (e.g., all necessary modules are imported and initialized, resources are handled if any were intended even with basic shapes).
-2. The main game loop correctly handles events, especially the `pygame.QUIT` event to allow the game to close gracefully.
-3. There are no unintentional infinite loops or deadlocks during the initialization phase or in the very early stages of the game loop that would prevent it from running smoothly for a few seconds.
-4. The game is structured to be runnable. For testing purposes, it should at least reach a state where it's clear the main loop has started.
+    def _is_suitable_for_partial_fix(self, error_message: str) -> bool:
+        """에러가 부분 수정으로 해결 가능한지 판단"""
+        # 문법 에러, 간단한 런타임 에러는 부분 수정 가능
+        partial_fix_indicators = [
+            "SyntaxError",
+            "NameError", 
+            "AttributeError",
+            "TypeError",
+            "ValueError",
+            "ImportError",
+            "ModuleNotFoundError",
+            "IndentationError",
+            "UnboundLocalError"
+        ]
+        
+        # 타임아웃이나 복잡한 로직 문제는 전체 재작성이 나을 수 있음
+        full_rewrite_indicators = [
+            "timed out",
+            "infinite loop",
+            "deadlock",
+            "hung",
+            "process killed"
+        ]
+        
+        error_lower = error_message.lower()
+        
+        # 전체 재작성이 필요한 경우
+        if any(indicator in error_lower for indicator in full_rewrite_indicators):
+            return False
+            
+        # 부분 수정 가능한 경우
+        if any(indicator in error_message for indicator in partial_fix_indicators):
+            return True
+            
+        # 기본적으로 부분 수정 시도
+        return True
 
-The specific error reported by the test environment was:
-{error_message}
+    def _extract_error_line_info(self, error_message: str) -> str:
+        """에러 메시지에서 라인 정보 추출"""
+        line_info = ""
+        
+        # "line X" 패턴 찾기
+        line_match = re.search(r'line (\d+)', error_message)
+        if line_match:
+            line_num = line_match.group(1)
+            line_info = f"The error appears to be on or around line {line_num}."
+        
+        # 파일명과 라인 정보가 함께 있는 경우
+        file_line_match = re.search(r'File "([^"]+)", line (\d+)', error_message)
+        if file_line_match:
+            filename = file_line_match.group(1)
+            line_num = file_line_match.group(2)
+            line_info = f"The error is in file '{filename}' at line {line_num}."
+        
+        return line_info
 
-Your task is to refine the code to ensure it's a robust, runnable Pygame application that adheres to the project goal.
-Focus on making sure the game can start, run its loop, and handle basic exit conditions.
-"""
-                else:
-                    error_context_for_ai = f"The code has the following error that needs to be fixed:\n{error_message}"
-
-            prompt = f"""
+    def _request_partial_fix(self, code: str, error_message: str, filename: str):
+        """부분 수정 요청"""
+        # 에러 위치 파악
+        error_line_info = self._extract_error_line_info(error_message)
+        
+        prompt = f"""
 PROJECT GOAL: {self.project_goal}
 
-You are improving the following Python code for the file '{current_filename_for_context if current_filename_for_context else "the project file"}'.
+Fix ONLY the specific error in the Python code for '{filename}'.
+Do NOT rewrite the entire code. Only modify the minimal parts necessary.
+
+ERROR TO FIX:
+{error_message}
+
+{error_line_info}
+
+CURRENT CODE:
+```python
+{code}
+```
+
+INSTRUCTIONS:
+You must respond with ONLY the corrected code in a single code block.
+Fix only what is necessary to resolve the error.
+Do not include explanations, markdown formatting outside the code block, or any other text.
+
+Provide the complete corrected code:
+"""
+
+        system_prompt = f"""You are an expert Python and Pygame developer.
+Fix the specific error in the provided code with minimal changes.
+
+CRITICAL RULES:
+- Provide ONLY the complete corrected Python code
+- Use a single ```python code block
+- No explanations or text outside the code block
+- Fix only what's necessary to resolve the reported error
+- Maintain the project goal: {self.project_goal}
+"""
+        
+        ai_response = call_ai(
+            system_prompt=system_prompt,
+            user_prompt=prompt,
+            translate=False
+        )
+        
+        # 코드 블록에서 Python 코드 추출
+        code_content = self._extract_code_from_response(ai_response)
+        
+        if code_content and self._is_valid_partial_fix(code, code_content):
+            return None, code_content  # 부분 수정 성공
+        else:
+            # 부분 수정 실패시 전체 재작성으로 폴백
+            print("[WARNING] Partial fix failed or invalid, falling back to full rewrite")
+            return self._request_full_rewrite(code, error_message, filename)
+
+    def _extract_code_from_response(self, ai_response: str) -> str:
+        """AI 응답에서 코드 블록 추출"""
+        # 코드 블록 패턴 찾기
+        code_block_patterns = [
+            r'```python\n(.*?)\n```',
+            r'```\n(.*?)\n```',
+            r'```python(.*?)```',
+            r'```(.*?)```'
+        ]
+        
+        for pattern in code_block_patterns:
+            match = re.search(pattern, ai_response, re.DOTALL)
+            if match:
+                code_content = match.group(1).strip()
+                if code_content and len(code_content) > 10:
+                    return code_content
+        
+        # 코드 블록이 없으면 응답 전체에서 Python 코드 라인 찾기
+        lines = ai_response.split('\n')
+        code_lines = []
+        in_code_section = False
+        
+        for line in lines:
+            stripped_line = line.strip()
+            
+            # 명확하게 Python 코드인 라인들
+            if (stripped_line.startswith(('import ', 'from ', 'def ', 'class ', 'if ', 'for ', 'while ', 'try:', 'except', 'pygame.')) or
+                re.match(r'^\s*\w+\s*=\s*', stripped_line) and not stripped_line.startswith('#')):
+                in_code_section = True
+                code_lines.append(line)
+            elif in_code_section and (stripped_line == '' or line.startswith('    ') or line.startswith('\t')):
+                # 들여쓰기된 라인이나 빈 라인은 코드의 일부로 간주
+                code_lines.append(line)
+            elif stripped_line.startswith('#') and not stripped_line.startswith('###'):
+                # 주석은 포함하되 마크다운 헤더는 제외
+                code_lines.append(line)
+            elif in_code_section and any(keyword in stripped_line for keyword in ['return', 'break', 'continue', 'pass', 'yield']):
+                code_lines.append(line)
+            elif stripped_line and not any(marker in stripped_line.lower() for marker in ['instruction:', 'response:', 'here is', 'fix for', '```']):
+                # 설명문이 아닌 경우에만 포함
+                if in_code_section:
+                    code_lines.append(line)
+            elif stripped_line and any(marker in stripped_line.lower() for marker in ['instruction:', 'response:', 'here is', 'fix for']):
+                # 설명문이 시작되면 코드 섹션 종료
+                break
+        
+        if code_lines:
+            return '\n'.join(code_lines).strip()
+        
+        return None
+
+    def _is_valid_partial_fix(self, original_code: str, fixed_code: str) -> bool:
+        """부분 수정이 유효한지 검증"""
+        # 기본 검증
+        if not fixed_code or len(fixed_code) < 10:
+            return False
+        
+        # 원본 코드와 너무 다르면 부분 수정이 아님
+        original_lines = set(original_code.split('\n'))
+        fixed_lines = set(fixed_code.split('\n'))
+        
+        # 공통 라인의 비율 계산
+        common_lines = original_lines.intersection(fixed_lines)
+        if len(original_lines) > 0:
+            similarity_ratio = len(common_lines) / len(original_lines)
+            # 50% 이상 유사하면 부분 수정으로 간주
+            if similarity_ratio < 0.5:
+                print(f"[WARNING] Fixed code too different from original (similarity: {similarity_ratio:.2f})")
+                return False
+        
+        # 문법 검증
+        try:
+            compile(fixed_code, '<string>', 'exec')
+            return True
+        except SyntaxError as e:
+            print(f"[WARNING] Fixed code has syntax error: {e}")
+            return False
+
+    def _apply_partial_changes(self, original_code: str, ai_response: str) -> str:
+        """AI의 부분 수정 지시사항을 적용 (레거시 메서드, 현재는 사용되지 않음)"""
+        # 이 메서드는 더 이상 사용되지 않지만 호환성을 위해 유지
+        return self._extract_code_from_response(ai_response)
+
+    def _parse_change_instructions(self, ai_response: str) -> list:
+        """AI 응답에서 변경 지시사항 파싱 (레거시 메서드, 현재는 사용되지 않음)"""
+        # 이 메서드는 더 이상 사용되지 않지만 호환성을 위해 유지
+        return []
+
+    def _request_full_rewrite(self, code: str, error_message: str, filename: str):
+        """전체 코드 재작성 요청"""
+        error_context_for_ai = ""
+        if error_message:
+            if "timed out" in error_message.lower() and \
+               "execution of" in error_message.lower() and \
+               filename and \
+               "pygame" in self.project_goal.lower():
+                error_context_for_ai = f"""
+The Python script '{filename}' started execution but did not finish within the {self.get_execution_timeout()} second time limit.
+This timeout likely means the game initialized and entered its main loop.
+
+Fix any issues and ensure the code:
+1. Initializes Pygame correctly
+2. Has a proper game loop with event handling
+3. Handles pygame.QUIT events to allow graceful exit
+4. Runs without immediate errors or hangs
+
+Error: {error_message}
+"""
+            else:
+                error_context_for_ai = f"Fix this error:\n{error_message}"
+
+        prompt = f"""
+PROJECT GOAL: {self.project_goal}
+
+Fix the Python code for '{filename}' to resolve the error and achieve the project goal.
 {error_context_for_ai}
 
 Current code:
 ```python
-{code_override}
+{code}
 ```
-You MUST fix any reported errors and improve the code to achieve the project goal.
-Provide ONLY the corrected and complete Python code in a single code block. No explanations.
+
+Provide ONLY the complete corrected Python code in a single code block. No explanations.
 """
-            system_prompt = f"""You are an expert Python and Pygame developer. 
-Your task is to improve Python code to achieve this specific goal: {self.project_goal}
+        system_prompt = f"""You are an expert Python and Pygame developer. 
+Fix the provided code to achieve: {self.project_goal}
 
 REQUIREMENTS:
-- Always provide complete, working Python code.
-- Code must be enclosed in a single ```python code block.
-- No explanations, comments, or text outside the code block.
-- Focus on creating functional, clean implementations that are robust.
-- Ensure the code achieves the specified project goal and can run without immediate errors or hangs.
-- If previous code timed out during execution, ensure the new code initializes correctly and the game loop is well-structured.
+- Provide complete, working Python code
+- Use a single ```python code block
+- No explanations or text outside the code block
+- Fix all errors and ensure the code runs properly
 """
-        else: # 새 코드 생성 모드
-            files = self.get_project_files()
-            structure = self.get_directory_structure()
-            prompt = f"""
-PROJECT GOAL: {self.project_goal}
-
-Current project state:
-Files: {files}
-Directory structure: {structure}
-
-You must create complete Python code from scratch to achieve the project goal.
-This is the initial code creation - make it comprehensive and functional.
-
-At the VERY BEGINNING of your response, before the Python code block, include a line specifying the target filename, like this:
-# filename: chosen_filename.py
-
-Then, provide ONLY Python code in a code block, no explanations.
-The code must be complete and ready to run.
-"""
-            system_prompt = f"""You are an expert Python developer. 
-Your task is to create code to achieve this specific goal: {self.project_goal}
-
-REQUIREMENTS:
-- At the VERY BEGINNING of your response, include a line like: # filename: chosen_filename.py
-- Then, provide complete, working Python code enclosed in ```python code blocks
-- No other explanations, comments, or text outside the code block
-- Focus on creating functional, clean implementations
-- Ensure the code achieves the specified project goal"""
         
         ai_response_content = call_ai(
             system_prompt=system_prompt,
@@ -161,38 +334,60 @@ REQUIREMENTS:
             translate=False
         )
         
+        # 코드 블록에서 Python 코드 추출
+        code_content = self._extract_code_from_response(ai_response_content)
+        
+        return None, code_content
+
+    def _request_new_code_generation(self):
+        """새 코드 생성 요청"""
+        files = self.get_project_files()
+        structure = self.get_directory_structure()
+        prompt = f"""
+PROJECT GOAL: {self.project_goal}
+
+Current project state:
+Files: {files}
+Directory structure: {structure}
+
+Create complete Python code from scratch to achieve the project goal.
+
+At the VERY BEGINNING of your response, include: # filename: chosen_filename.py
+Then provide ONLY Python code in a code block, no explanations.
+"""
+        system_prompt = f"""You are an expert Python developer. 
+Create code to achieve: {self.project_goal}
+
+REQUIREMENTS:
+- Start with: # filename: chosen_filename.py
+- Provide complete Python code in ```python code blocks
+- No explanations outside the code block
+- Ensure the code achieves the project goal"""
+        
+        ai_response_content = call_ai(
+            system_prompt=system_prompt,
+            user_prompt=prompt,
+            translate=False
+        )
+        
+        generated_filename = None
         code_content = None
 
-        if not code_override: # 새 코드 생성 시에만 파일명 파싱 시도
-            filename_match = re.search(r'^#\s*filename:\s*([\w\.-]+\.py)\s*$', ai_response_content, re.IGNORECASE | re.MULTILINE)
-            if filename_match:
-                generated_filename = filename_match.group(1).strip()
-                # 코드 파싱을 위해 파일명 줄 제거
-                ai_response_content = ai_response_content[filename_match.end():].strip()
-            else:
-                print("[WARNING] AI did not provide a filename in the expected format for new code.")
+        # 파일명 파싱
+        filename_match = re.search(r'^#\s*filename:\s*([\w\.-]+\.py)\s*$', ai_response_content, re.IGNORECASE | re.MULTILINE)
+        if filename_match:
+            generated_filename = filename_match.group(1).strip()
+            # 파일명 라인 이후의 내용만 코드 추출 대상으로 함
+            ai_response_content = ai_response_content[filename_match.end():].strip()
+        else:
+            print("[WARNING] AI did not provide a filename in the expected format for new code.")
         
         # 코드 블록에서 Python 코드 추출
-        match = re.search(r'```(?:python)?\n(.*?)\n```', ai_response_content, re.DOTALL)
-        if match:
-            code_content = match.group(1).strip()
-        else:
-            # 코드 블록이 없으면 전체 응답에서 코드 같은 부분 찾기 (Fallback)
-            lines = ai_response_content.split('\n')
-            code_lines = []
-            for line in lines:
-                stripped_line = line.strip()
-                if stripped_line.startswith(('import ', 'from ', 'def ', 'class ')) or \
-                   (re.match(r'^\s*(if|for|while|try|except|finally|with|return|yield|pass|break|continue)', stripped_line)) or \
-                   (re.match(r'^\s*\w+\s*=\s*', stripped_line) and not stripped_line.startswith('#')):
-                    code_lines.append(line)
-            
-            if code_lines:
-                code_content = '\n'.join(code_lines).strip()
-            
-            if not code_content or len(code_content) < 10:
-                print("[WARNING] Could not find a valid Python code block or substantial code lines in AI response.")
-                code_content = None
+        code_content = self._extract_code_from_response(ai_response_content)
+        
+        if not code_content or len(code_content) < 10:
+            print("[WARNING] Could not extract valid Python code from AI response.")
+            code_content = None
 
         return generated_filename, code_content
 
