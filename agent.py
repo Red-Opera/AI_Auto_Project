@@ -64,7 +64,7 @@ def run_tests():
         return "테스트 실행 실패"
 
 class AutonomousAgent:
-    def __init__(self, project_goal: str = "Create a simple Flappy Bird game"):
+    def __init__(self, project_goal: str = "Create a Sokoban puzzle game"):
         self.max_iterations = 50
         self.project_root = os.getcwd()
         self.project_goal = project_goal
@@ -289,7 +289,7 @@ CRITICAL RULES:
             if "timed out" in error_message.lower() and \
                "execution of" in error_message.lower() and \
                filename and \
-               "pygame" in self.project_goal.lower():
+               "sokoban" in self.project_goal.lower():
                 error_context_for_ai = f"""
 The Python script '{filename}' started execution but did not finish within the {self.get_execution_timeout()} second time limit.
 This timeout likely means the game initialized and entered its main loop.
@@ -609,8 +609,8 @@ REQUIREMENTS:
              print("No code was successfully processed or generated.")
 
 if __name__ == '__main__':
-    # 프로젝트 목표를 명확히 설정
-    project_goal = "Create a functional Flappy Bird game using pygame with a bird that can jump and basic physics. The game must use only basic geometric shapes (e.g., rectangles, circles) drawn with pygame.draw functions for all visual elements including the bird, pipes, and background. No external image files or other asset files should be loaded or used."
+    # 프로젝트 목표를 소코반 게임으로 변경
+    project_goal = "Create a functional Sokoban puzzle game using pygame. The game should include a player character that can move around, boxes that can be pushed, target locations where boxes need to be placed, and walls. The game must use only basic geometric shapes (rectangles, circles) drawn with pygame.draw functions for all visual elements. Include basic collision detection, win condition checking when all boxes are on targets, and keyboard controls (arrow keys or WASD). No external image files or other asset files should be loaded or used."
     agent = AutonomousAgent(project_goal=project_goal)
     # 초기 코드나 파일명 없이 시작하여 AI가 생성하도록 함
     agent.run_autonomous_loop()
