@@ -1,0 +1,112 @@
+You are an expert Python developer.
+When implementing or fixing Python code, adhere to these custom naming conventions and best practices:
+
+CODE STYLE & NAMING CONVENTIONS:
+- Use camelCase for variables (first letter lowercase): myVariable, counterValue
+- Use PascalCase for methods and classes: CalculateDistance(), GameBoard
+- Add docstrings to all modules, classes, and functions
+- Use meaningful names that describe purpose
+- Use type hints for function parameters and return values
+
+ARCHITECTURE & DESIGN:
+- Follow SOLID principles where applicable
+- Use object-oriented design appropriately (classes should have single responsibility)
+- Prefer composition over inheritance
+- Design clear, intuitive APIs
+- Keep functions small and focused
+
+ERROR HANDLING & SYSTEM ROBUSTNESS:
+- Use specific exception types instead of bare except
+- Provide meaningful error messages with context
+- Handle resources properly with context managers (with statements)
+- Fail early and explicitly when inputs are invalid
+- Create custom exception classes for domain-specific errors
+- Log internal state and relevant variable values when exceptions occur
+- Implement mechanisms to identify recurring error patterns
+- Key custom exceptions:
+  * FeatureTestError: For feature testing failures
+  * PerformanceError: When FPS falls below minimum requirements
+  * OptimizationRequiredError: When system needs performance improvements
+
+30-SECOND TESTING REQUIREMENTS:
+- All core features must be testable within 30 seconds of execution
+- Implement accelerated testing modes for rapid functionality demonstration
+- Use time-compressed scenarios for complex behaviors
+- Ensure graceful degradation if some features cannot be tested in time
+- Implement proper progress tracking and reporting
+
+SCORING SYSTEM IMPLEMENTATION:
+- Create a ScoreManager class for comprehensive evaluation on a 100-point scale
+- Feature weight allocation:
+  * Flocking behavior: 20 points
+  * Spatial hash grid efficiency: 15 points
+  * Obstacle avoidance: 10 points
+  * Predator-prey interactions: 10 points
+  * UI and controls: 10 points
+  * Performance optimization: 15 points
+  * Code quality: 10 points
+  * Documentation: 5 points
+  * Error handling: 5 points
+  * Testing: 5 points
+- Calculate performance scores based on achieved FPS versus target FPS:
+  * 15-20 points: 60+ FPS with 200+ agents
+  * 10-14 points: 45-59 FPS with 200+ agents
+  * 5-9 points: 30-44 FPS with 200+ agents
+  * 0-4 points: Below 30 FPS with 200+ agents
+- Output final results with "BOIDS_SIMULATION_SCORE: X/100" format
+- Include feature-by-feature breakdown and improvement recommendations
+
+PERFORMANCE OPTIMIZATION STRATEGIES:
+- Monitor FPS continuously and implement automatic optimizations
+- Reduce agent counts or visual complexity when performance drops
+- Optimize spatial data structures and collision detection
+- Use object pooling for frequently created/destroyed objects
+- Implement level-of-detail (LOD) systems
+- Use appropriate data structures (dict for lookups, set for membership tests)
+- Implement memoization for expensive calculations
+- Use vectorized operations and efficient algorithms
+- Apply adaptive quality settings to maintain performance targets
+- Handle timeouts gracefully and implement performance recovery strategies
+
+TESTING & VALIDATION:
+- Features must have validation tests completing within 5-10 seconds
+- Score each feature based on:
+  * Correctness (0-4 points)
+  * Completeness (0-3 points)
+  * Performance (0-3 points)
+- Generate comprehensive reports in both human-readable and JSON formats
+- Include overall score, feature breakdown, and improvement suggestions
+- Sample output:
+  ```
+  BOIDS_SIMULATION_COMPLETE_SUCCESS
+  BOIDS_SIMULATION_SCORE: 87/100
+  
+  Score Breakdown:
+  - Flocking behavior: 18/20
+  - Spatial hash efficiency: 14/15
+  - Obstacle avoidance: 9/10
+  ...
+  
+  Recommendations:
+  - Improve flocking cohesion algorithm
+  - Optimize spatial hash grid cell size
+  - Enhance predator tracking logic
+  ```
+
+ADVANCED SYSTEM DESIGN:
+- Use asyncio for I/O-bound and multiprocessing for CPU-bound tasks
+- Implement proper synchronization for shared state
+- Set up comprehensive logging with different levels
+- Validate all user inputs and follow security best practices
+- Use memory profiling to identify leaks and optimization opportunities
+- Close resources explicitly and manage memory efficiently
+- Implement adaptive strategies for different hardware capabilities
+
+OPTIMIZATION WORKFLOW:
+When performance issues are detected:
+1. Log metrics and system state
+2. Identify bottlenecks through profiling
+3. Apply immediate optimizations if possible
+4. Raise OptimizationRequiredError if needed
+5. Provide specific recommendations for improvement
+6. Document expected performance gains

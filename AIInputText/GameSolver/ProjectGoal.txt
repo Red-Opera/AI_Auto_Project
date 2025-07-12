@@ -1,0 +1,60 @@
+Development Goal: Create an AI simulation system that automatically solves Sokoban puzzle games with Pygame visualization.
+
+Key Requirements:
+1) Parse map data from the provided 'sokoban-maps-60-plain.txt' file to generate game maps.
+2) Automatically solve all maps sequentially from map 1 to map 60.
+3) Implement Sokoban game rules perfectly:
+   - The player (@) can move up, down, left, and right.
+   - The player can push boxes (*) but cannot pull them.
+   - Boxes can only be pushed one at a time (cannot push multiple boxes simultaneously).
+   - Boxes cannot pass through walls (X) or other boxes.
+   - A level is completed when all boxes are placed on target points (.).
+   - A box on a target point is represented by a special character ($).
+   - A player on a target point is represented by a special character (+).
+
+4) Implement AI solving algorithms autonomously. Choose and implement the most effective approach:
+   - BFS (Breadth-First Search)
+   - DFS (Depth-First Search)
+   - A* algorithm
+   - Heuristic-based search
+   - Deadlock detection and handling mechanisms
+   - Pattern databases or precomputed heuristics
+
+5) Visualization using Pygame:
+   - Create a graphical interface using Pygame to display the game board.
+   - Show the player, boxes, walls, and target points with appropriate sprites or colors.
+   - Animate each movement step with smooth transitions.
+   - Display the solution progress, current map number, and total moves.
+   - Add a visual indication when a map is solved.
+   - The visualization should be clean and user-friendly.
+
+6) Automatic execution mode:
+   - When executed with the command-line argument '--auto-solve', all maps should be solved automatically without user input.
+   - Output "MAP_X_COMPLETE" message when each map is solved (X is the map number).
+   - Output "ALL_MAPS_COMPLETE_SUCCESS" message when all maps are solved.
+   - Display appropriate error messages for unsolvable maps.
+
+7) Performance and optimization:
+   - Find the optimal solution (minimum number of moves) for each map.
+   - Explore the state space in a memory-efficient manner.
+   - Implement mechanisms to prevent infinite loops or deadlocks.
+
+8) Exception handling and error management:
+   - Handle map parsing errors appropriately.
+   - Handle memory limitations and timeouts.
+   - Detect and report unsolvable maps appropriately.
+
+9) Statistics and analysis:
+   - Record solving time, number of moves, and number of states explored for each map.
+   - Provide summary statistics for all maps.
+
+Technical Implementation Requirements:
+- The program must be implemented in Python.
+- Use Pygame for visualization and standard libraries for core functionality.
+- The AI should autonomously determine the best implementation approach.
+- Code should be modular and object-oriented.
+- Provide appropriate comments and documentation.
+- Include test cases.
+- Ensure there are no compilation or runtime errors.
+
+This system must be capable of automatically solving all 60 provided Sokoban maps, featuring efficient algorithms and an engaging visualization through Pygame.

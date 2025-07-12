@@ -1,0 +1,51 @@
+Development Goal: Implement a spatial hash-based Boids++ simulation system using Pygame
+- Including flocking behavior, obstacle avoidance, and predator-prey interactions
+
+Key Requirements:
+1) Spatial Hash Grid System:
+   - Optimize collision detection and neighbor finding
+   - Assign agents to grid cells based on position
+
+2) Multiple Agent Types:
+   - Standard Boids, Predators, Obstacles, Leaders
+
+3) Flocking Algorithms:
+   - Separation, alignment, cohesion, obstacle avoidance, boundary handling, predator evasion
+
+4) AI Behavioral Systems:
+   - Weighted steering behaviors, state machines, adaptive behavior
+
+5) Pygame Visualization:
+   - Agent movements, grid overlay, statistics display
+
+6) Interactive Controls:
+   - Real-time parameter adjustment, visualization mode switching, simulation control
+
+7) Automatic Testing Mode:
+   - 30-second accelerated testing for key features validation
+   - Performance reports and behavioral analysis
+
+8) Performance Optimization:
+   - Efficient grid implementation, vectorized operations
+   - CRITICAL: Implement aggressive optimization techniques to reach target frame rates
+   - Use all available methods to maximize performance once functionality is correct
+   - Consider: multi-threading, GPU acceleration, algorithm refinement, data structure optimization
+
+9) Configuration System:
+   - External config file support, various simulation presets
+
+10) Advanced Features:
+    - Group splitting/merging, environmental factors, learning algorithms
+
+Technical Implementation Requirements:
+- Python OOP design, Pygame, numpy
+- Efficient spatial hash grid data structure
+- Modular code, thorough documentation
+- Speed control system
+- Apply creative optimization strategies as needed to meet performance targets
+
+Performance Targets:
+- Maintain 60 FPS with 200+ agents at normal speed
+- Support up to 10x speed multipliers
+- Reduce collision checks by 80%+
+- Performance is a top priority after functional
